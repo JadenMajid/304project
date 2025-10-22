@@ -1,3 +1,10 @@
+/*
+When looking at this SQL file, there are 2 parts
+1. Table Initializations
+  - FK ON X justifications are done as comments
+2. Insert statements
+*/
+
 CREATE TABLE Ride (
   RideName      VARCHAR PRIMARY KEY,
   Capacity      INTEGER,       -- should CHECK (Capacity > 0)
@@ -19,7 +26,7 @@ CREATE TABLE Booking (
 
 CREATE TABLE RateModifier (
   RateCode      INTEGER PRIMARY KEY,
-  Modifier      FLOAT
+  Modifier      FLOAT DEFAULT 1.0
 );
 
 CREATE TABLE RoomType (
@@ -45,7 +52,10 @@ CREATE TABLE Ticket2 (
   ValidHours    INTEGER,       -- should CHECK (ValidHours >= 0)
   CONSTRAINT fk_ticket2_booking FOREIGN KEY (BookingNumber)
     REFERENCES Booking (BookingNumber)
+    -- When bookings are deleted(like a cancellation or refund), any associated tickets should be deleted as well
     ON DELETE CASCADE
+     -- Booking numbers should not be updated, in cases where they are, tickets that reference them should still reference the same booking 
+    ON UPDATE CASCADE
 );
 
 CREATE TABLE Ticket1 (
@@ -61,6 +71,9 @@ CREATE TABLE FastPassTicket (
   ValidHours    INTEGER,       -- should CHECK (ValidHours >= 0)
   CONSTRAINT fk_fastpass_ticket FOREIGN KEY (TicketID)
     REFERENCES Ticket2 (TicketID)
+    -- When tickets IDs are changed, they should still be fastpass tickets
+    ON UPDATE CASCADE
+    -- When tickets are deleted, the associated fastpass information should also be deleted
     ON DELETE CASCADE
 );
 
@@ -79,7 +92,10 @@ CREATE TABLE SeasonPass (
   LoyaltyID       INTEGER,
   CONSTRAINT fk_seasonpass_loyalty FOREIGN KEY (LoyaltyID)
     REFERENCES LoyaltyMember (LoyaltyID)
-    ON DELETE SET NULL
+    -- Should never be triggered, but SeasonPasses should be tied to one user
+    ON UPDATE CASCADE
+    -- When a user deletes their account, any associations like SeasonPasses should also be deleted
+    ON DELETE CASCADE
 );
 
 CREATE TABLE SeasonPassSpecial (
@@ -88,22 +104,28 @@ CREATE TABLE SeasonPassSpecial (
   PRIMARY KEY (UUID, RateCode),
   CONSTRAINT fk_sps_seasonpass FOREIGN KEY (UUID)
     REFERENCES SeasonPass (UUID)
+    -- Should never be triggered, SeasonPass should be immutable after insertion
     ON DELETE SET NULL,
   CONSTRAINT fk_sps_ratemodifier FOREIGN KEY (RateCode)
     REFERENCES RateModifier (RateCode)
-    ON DELETE SET NULL
+    -- When a RateModifier's RateCode, any associated SeasonPasses should still reference the same RateCode
+    ON DELETE CASCADE
 );
 
 CREATE TABLE BookedWithRateModifier (
-  RateCode      INTEGER,
+  RateCode      INTEGER DEFAULT 0,
   BookingNumber INTEGER,
   PRIMARY KEY (RateCode, BookingNumber),
   CONSTRAINT fk_bwrm_rate FOREIGN KEY (RateCode)
     REFERENCES RateModifier (RateCode)
-    ON DELETE SET NULL,
+    -- Bookings should always point to the same RateCode, even if that ratecode is changed
+    ON UPDATE CASCADE
+    -- Bookings booked with rate modifiers point to a default ratecode with Modifier=1.0 when its ratecode is deleted 
+    ON DELETE SET DEFAULT,
   CONSTRAINT fk_bwrm_booking FOREIGN KEY (BookingNumber)
     REFERENCES Booking (BookingNumber)
-    ON DELETE SET NULL
+    -- When booking are deleted, references to it become invalid so should be deleted too
+    ON DELETE CASCADE
 );
 
 CREATE TABLE OffersRoomType (
@@ -113,6 +135,7 @@ CREATE TABLE OffersRoomType (
   PRIMARY KEY (HotelName, RoomName),
   CONSTRAINT fk_offers_hotel FOREIGN KEY (HotelName)
     REFERENCES Hotel (HotelName)
+    -- 
     ON DELETE SET NULL,
   CONSTRAINT fk_offers_room FOREIGN KEY (RoomName)
     REFERENCES RoomType (RoomName)
