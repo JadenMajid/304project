@@ -135,10 +135,11 @@ CREATE TABLE OffersRoomType (
   PRIMARY KEY (HotelName, RoomName),
   CONSTRAINT fk_offers_hotel FOREIGN KEY (HotelName)
     REFERENCES Hotel (HotelName)
-    -- 
+    -- Hotels should never be deleted, but in that case that it is, the Roomtypes offered should be saved for history reasons
     ON DELETE SET NULL,
   CONSTRAINT fk_offers_room FOREIGN KEY (RoomName)
     REFERENCES RoomType (RoomName)
+    -- Roomtypes should never be deleted, but if they are they should be kept for history reasons
     ON DELETE SET NULL
 );
 
@@ -152,13 +153,22 @@ CREATE TABLE HotelStay (
   BookingNumber  INTEGER NOT NULL,
   CONSTRAINT fk_hs_hotel FOREIGN KEY (HotelName)
     REFERENCES Hotel (HotelName)
-    ON DELETE CASCADE,
+    -- if a hotel is deleted, hotel stays should be kept for historical reasons
+    ON DELETE SET NULL,
+    -- if a hotel changes its name, the new name should be used for all records for consistency
+    ON UPDATE CASCADE
   CONSTRAINT fk_hs_room FOREIGN KEY (RoomName)
     REFERENCES RoomType (RoomName)
-    ON DELETE CASCADE,
+    -- if a roomtype is deleted, we should keep the stays 
+    ON DELETE SET NULL,
+    -- if the name of a roomtype changes, we should update records to reflect the new name
+    ON UPDATE CASCADE
   CONSTRAINT fk_hs_booking FOREIGN KEY (BookingNumber)
     REFERENCES Booking (BookingNumber)
+    -- If a booking is deleted, the hotel stay associated with it is no longer valid, so should be deleted
     ON DELETE CASCADE
+    --
+    ON UPDATE 
 );
 
 CREATE TABLE ForRide (
